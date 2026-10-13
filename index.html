@@ -1,0 +1,1958 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>理論庫</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1f2328; --muted: #656d76;
+  --line: #d8dee4; --accent: #0969da; --accent-text: #ffffff; --sel: #ddf4ff;
+  --red: #cf222e; --orange: #bc4c00; --chip: #eaeef2; --banner-red: #ffebe9;
+  --shadow: 0 8px 28px rgba(0,0,0,.18);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117; --panel: #161b22; --text: #e6edf3; --muted: #9198a1;
+    --line: #30363d; --accent: #4493f8; --accent-text: #0d1117; --sel: #1f3a5f;
+    --red: #f85149; --orange: #db6d28; --chip: #21262d; --banner-red: #3c1618;
+    --shadow: 0 8px 28px rgba(0,0,0,.6);
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--text); display: flex; flex-direction: column;
+  font: 14px/1.55 system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+button { font: inherit; color: inherit; background: var(--chip); border: 1px solid var(--line);
+  border-radius: 6px; padding: 4px 12px; cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+button.danger { background: var(--red); color: #fff; border-color: var(--red); }
+button.ghost-danger { background: none; color: var(--red); border-color: transparent; }
+button.ghost-danger:hover { border-color: var(--red); }
+#agent { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--orange); }
+input, textarea { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px 8px; width: 100%; }
+input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+/* the editors sit on the page background: fields take the panel colour so they read as fields */
+#editor input, #editor textarea, #ws-editor input, #ws-editor textarea { background: var(--panel); }
+textarea { resize: none; overflow: hidden; min-height: 76px; display: block; }
+textarea.raw { font-family: ui-monospace, Consolas, monospace; min-height: 300px; }
+textarea.body { min-height: 260px; }
+.muted { color: var(--muted); }
+small { color: var(--muted); font-size: 12px; font-weight: normal; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.dot.red { background: var(--red); } .dot.orange { background: var(--orange); }
+.dot.none { background: transparent; }
+
+header { display: flex; align-items: center; gap: 10px; padding: 8px 14px;
+  border-bottom: 1px solid var(--line); background: var(--panel); flex: none; }
+header h1 { font-size: 16px; margin: 0; white-space: nowrap; }
+header button { white-space: nowrap; flex: none; }
+header .dir { font-family: ui-monospace, Consolas, monospace; font-size: 12px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 220px; }
+header .spacer { flex: 1; }
+#status { font-size: 13px; white-space: nowrap; } #status.err { color: var(--red); white-space: normal; }
+.counts { display: flex; align-items: center; gap: 4px; font-size: 13px; white-space: nowrap; }
+.counts button, .counts .count { display: inline-flex; align-items: center; gap: 5px; background: none;
+  border: 1px solid transparent; padding: 2px 8px; }
+.counts button.on { background: var(--sel); border-color: var(--accent); }
+#agent { white-space: nowrap; }
+
+#main { flex: 1; display: grid; grid-template-columns: var(--tree-w, clamp(300px, 22vw, 440px)) 1fr 1fr; min-height: 0;
+  position: relative; }
+#main > * { overflow: auto; min-height: 0; }
+#tree { border-right: 1px solid var(--line); background: var(--panel); padding: 0 0 8px; }
+#tree-handle { position: absolute; top: 0; bottom: 0; left: calc(var(--tree-w, clamp(300px, 22vw, 440px)) - 3px);
+  width: 6px; cursor: col-resize; z-index: 2; }
+#tree-handle:hover, #tree-handle.drag { background: var(--accent); opacity: .35; }
+#tree-tools { position: sticky; top: 0; z-index: 1; background: var(--panel); padding: 8px 10px 6px; }
+.filter { position: relative; }
+.filter input { padding-right: 28px; }
+.filter button { position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+  border: none; background: none; padding: 0 8px; color: var(--muted); }
+.filter button:hover { color: var(--text); }
+#tree-kind { display: flex; margin-top: 6px; }
+#tree-kind:empty { display: none; }
+#editor { padding: 16px 20px 40px; }
+#ref { border-left: 1px solid var(--line); background: var(--panel); padding: 16px 20px 40px; }
+
+.row { display: flex; align-items: center; gap: 6px; padding: 3px 10px; cursor: pointer;
+  white-space: nowrap; }
+.row:hover { background: var(--chip); }
+.row.sel { background: var(--sel); }
+.row .caret { width: 18px; height: 18px; flex: none; display: inline-flex; align-items: center;
+  justify-content: center; color: var(--muted); font-size: 14px; border-radius: 4px; }
+.row .caret.has:hover { background: var(--line); color: var(--text); }
+/* titles carry the description now and run long: they shrink before the markers do */
+.row .rid { font-weight: 600; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.row .rsum { flex: 0 10000 auto; }   /* a body snippet gives way first */
+.row .rsum { color: var(--muted); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.row .also { color: var(--muted); flex: none; }
+.row.off .rid, .row.off .rsum { opacity: .45; }
+.row.ctx .rid { font-weight: normal; color: var(--muted); }   /* ancestor shown only for its path */
+.tag { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px;
+  padding: 0 4px; flex: none; }
+.row input[type=checkbox] { width: auto; margin: 0; flex: none; }
+.row.marker { cursor: default; color: var(--muted); font-size: 12px; padding-top: 10px; }
+.row.marker:hover { background: none; }
+.tree-empty { padding: 12px 16px; }
+
+/* the controls stay smaller than the title, so the title is what the eye lands on */
+.ed-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0 0 4px; font-size: 13px; }
+.ed-bar button { padding: 1px 10px; }
+.ed-title { font-size: 20px; font-weight: 600; line-height: 1.4; margin: 0 0 2px; overflow-wrap: anywhere; }
+/* the title is the theory's description, so it is edited in place: it reads as a
+   heading and shows it is a field on hover and focus */
+#editor textarea.ed-title, #ws-editor textarea.ed-title { background: none; border-color: transparent;
+  padding: 2px 6px; margin-left: -7px; min-height: 0; }
+#editor textarea.ed-title:hover, #ws-editor textarea.ed-title:hover { border-color: var(--line); }
+#editor textarea.ed-title:focus, #ws-editor textarea.ed-title:focus { background: var(--panel); }
+/* one line is kept for the hint even when empty, so it appears without moving anything */
+.ed-hint { font-size: 12px; line-height: 1.5; color: var(--muted); margin: 0 0 12px; min-height: 1.5em; }
+.ed-hint.err { color: var(--red); }
+.switch { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer;
+  white-space: nowrap; }
+.switch input { width: auto; margin: 0; }
+.off-tag { color: var(--orange); border-color: var(--orange); font-size: 12px; padding: 1px 6px; }
+/* while picking, the editor and reference pane give way to the picked theories side by side */
+body.selecting #editor, body.selecting #ref { display: none; }
+#compare { display: none; grid-column: 2 / 4; }
+body.selecting #compare { display: flex; }
+#compare > .muted { padding: 16px 20px; }
+.banner { border-radius: 6px; padding: 8px 12px; margin: 0 0 12px; }
+.banner.red { background: var(--banner-red); border-left: 3px solid var(--red); }
+.banner ul { margin: 0; padding-left: 18px; }
+.banner .actions { margin-top: 6px; display: flex; gap: 8px; }
+.field { margin: 0 0 16px; }
+.field > label { display: block; font-weight: 600; margin-bottom: 4px; }
+/* how to write a field is said while writing it; hidden, it keeps its space so nothing moves */
+.field .focus-hint { visibility: hidden; }
+.field:focus-within .focus-hint { visibility: visible; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip { background: var(--chip); border: 1px solid var(--line); border-radius: 999px;
+  padding: 1px 4px 1px 10px; display: inline-flex; align-items: center; gap: 2px; }
+.chip button { border: none; background: none; padding: 0 6px; color: var(--muted); }
+.chip button:hover { color: var(--red); }
+.picker { position: relative; min-width: 260px; }
+.picker ul { position: absolute; z-index: 5; left: 0; right: 0; top: 100%; margin: 2px 0 0;
+  padding: 4px 0; list-style: none; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 6px; box-shadow: var(--shadow); max-height: 280px; overflow: auto; }
+.picker li { padding: 4px 10px; cursor: pointer; }
+.picker li.hi { background: var(--sel); }
+.picker li .muted { font-size: 12px; }
+
+.ref-title { font-weight: 600; margin: 0 0 10px; }
+.ref-title small { display: block; font-weight: normal; }
+.view h4 { margin: 14px 0 4px; font-size: 13px; }
+.md { word-break: break-word; }
+.md > :first-child { margin-top: 0; } .md > :last-child { margin-bottom: 0; }
+.md p, .md ul, .md ol, .md pre { margin: 0 0 8px; }
+.md ul, .md ol { padding-left: 20px; }
+.md h1, .md h2, .md h3, .md h4, .md h5, .md h6 { font-size: 14px; margin: 10px 0 4px; }
+.md code { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; background: var(--chip);
+  padding: 0 4px; border-radius: 4px; }
+.md pre { background: var(--chip); padding: 8px 10px; border-radius: 6px; overflow-x: auto; }
+.md pre code { background: none; padding: 0; }
+details { border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; }
+details > summary { cursor: pointer; font-weight: 600; }
+
+#bottombar { display: none; align-items: center; gap: 10px; padding: 8px 14px;
+  border-top: 1px solid var(--line); background: var(--panel); flex: none; }
+#bottombar.on { display: flex; }
+#bottombar .spacer { flex: 1; }
+
+/* abstraction workspace: what is being written on the left, full height; the
+   children it abstracts side by side on the right, as in the main view's ref pane */
+#workspace { flex: 1; display: none; flex-direction: column; min-height: 0; --ed-w: 44%; }
+#workspace.on { display: flex; }
+#ws-head { display: flex; align-items: center; padding: 10px 16px; gap: 10px;
+  border-bottom: 1px solid var(--line); background: var(--panel); }
+#ws-body { flex: 1; display: flex; min-height: 0; }
+#ws-editor { flex: 0 0 var(--ed-w); overflow: auto; padding: 16px 20px 40px; min-width: 0; }
+#divider { width: 7px; cursor: col-resize; background: var(--line); flex: none; }
+.cols { flex: 1; display: flex; overflow-x: auto; min-width: 0; }
+.cols .col { flex: 0 0 max(320px, calc(100% / var(--ncols))); overflow: auto; padding: 0 16px 24px;
+  border-right: 1px solid var(--line); background: var(--panel); }
+.cols .col h3 { position: sticky; top: 0; background: var(--panel); margin: 0 -16px 8px;
+  padding: 12px 16px 8px; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 6px; }
+.cols .col h3 button { margin-left: auto; border: none; background: none; padding: 0 6px; color: var(--muted); }
+.cols .col h3 button:hover { color: var(--red); }
+#ws-foot { display: flex; justify-content: flex-end; padding: 8px 16px;
+  border-top: 1px solid var(--line); background: var(--panel); }
+
+.center { flex: 1; display: flex; align-items: center; justify-content: center; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 28px 32px; text-align: center; max-width: 520px; }
+.card code { font-size: 13px; }
+
+dialog { border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
+  color: var(--text); padding: 20px 22px; width: min(560px, calc(100vw - 32px));
+  box-shadow: var(--shadow); }
+dialog::backdrop { background: rgba(0,0,0,.35); }
+dialog h3 { margin: 0 0 14px; }
+dialog .err { color: var(--red); min-height: 1.4em; font-size: 13px; }
+dialog .foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+dialog label.chk { display: flex; gap: 8px; align-items: flex-start; font-weight: normal; margin: 6px 0; }
+dialog label.chk input { width: auto; margin-top: 4px; }
+
+/* left column: tree or a flat list */
+#tree-switch { display: flex; margin-top: 6px; }
+#tree-switch button { flex: 1; border-radius: 0; padding: 2px 6px; font-size: 12px; margin-left: -1px; }
+#tree-switch button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
+#tree-switch button:last-child { border-radius: 0 6px 6px 0; }
+#tree-switch button.on { background: var(--sel); border-color: var(--accent); position: relative; }
+.group { padding: 10px 12px 2px; font-size: 12px; color: var(--muted); }
+.row .meta { color: var(--muted); font-size: 12px; margin-left: auto; padding-left: 8px;
+  flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+button.link { border: none; background: none; padding: 0 2px; color: var(--accent); text-decoration: underline; }
+button.on { background: var(--sel); border-color: var(--accent); }
+
+/* dragging a row onto another moves or adds a parent edge */
+.row.drop-ok, #drop-root.drop-ok { background: var(--sel); box-shadow: inset 0 0 0 1px var(--accent); }
+.row.drop-no { cursor: no-drop; }
+/* laid over the filter box, so showing it moves no row out from under the pointer */
+#drop-root { position: absolute; inset: 6px 10px; z-index: 2; display: flex; align-items: center;
+  justify-content: center; padding: 6px 8px; border: 1px dashed var(--accent); border-radius: 6px;
+  background: var(--panel); font-size: 12px; color: var(--muted); text-align: center; }
+#drop-root[hidden], #drag-hint[hidden] { display: none; }
+#drag-hint { position: fixed; z-index: 10; pointer-events: none; background: var(--panel); color: var(--text);
+  border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; font-size: 12px;
+  box-shadow: var(--shadow); max-width: 380px; }
+#drag-hint.no { color: var(--red); }
+
+/* editor meta line: when it came in, how much agents use it */
+.ed-meta { color: var(--muted); font-size: 12px; margin-left: auto; }
+
+/* related theories pane */
+.rel-sec { margin: 0 0 18px; }
+.rel-sec h4 { margin: 0 0 6px; font-size: 13px; }
+.crumbs { font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.crumbs .sep { color: var(--muted); margin: 0 6px; }
+.crumbs a, a.go { color: inherit; text-decoration: none; }
+.crumbs a:hover, a.go:hover { color: var(--accent); text-decoration: underline; }
+.under { font-size: 12px; margin: 6px 0 4px; }
+details.rel > summary { display: flex; align-items: baseline; gap: 6px; list-style: none; }
+details.rel > summary::before { content: "▸"; color: var(--muted); flex: none; }
+details.rel[open] > summary::before { content: "▾"; }
+details.rel > summary .go { flex: 0 1 auto; min-width: 0; }
+details.rel > summary button.small { margin-left: auto; padding: 0 8px; font-size: 12px; font-weight: normal; flex: none; }
+details.rel > .view, details.rel > textarea { margin-top: 6px; }
+details.rel.editing { border-color: var(--accent); }
+textarea.rel-edit { background: var(--bg); min-height: 120px; }
+details.theirs { margin: 8px 0 0; background: var(--panel); }
+
+/* focus: the theory being written, and its relatives if wanted; nothing else */
+#focus-ref, #focus-exit { display: none; }
+body.focus #focus-ref, body.focus #focus-exit { display: inline-block; }
+body.focus header > :not(#status):not(.spacer):not(#sync):not(#focus-ref):not(#focus-exit) { display: none; }
+body.focus #tree, body.focus #tree-handle { display: none; }
+body.focus #main { grid-template-columns: 1fr minmax(300px, 36%); }
+body.focus.noref #main { grid-template-columns: 1fr; }
+body.focus.noref #ref { display: none; }
+body.focus #editor > * { max-width: 760px; margin-left: auto; margin-right: auto; }
+body.focus #editor { padding-top: 28px; }
+
+/* phone: one screen at a time, the list, or the open theory with its relatives a tab away */
+#mbar { display: none; }
+body.narrow #mbar:not(:empty) { display: flex; align-items: center; gap: 10px; padding: 6px 12px;
+  border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 3; }
+#mbar .back { font-size: 18px; line-height: 1; padding: 4px 12px; }
+#mbar .seg { display: flex; flex: 1; justify-content: center; }
+#mbar .seg button { border-radius: 0; padding: 4px 18px; margin-left: -1px; }
+#mbar .seg button:first-child { border-radius: 6px 0 0 6px; }
+#mbar .seg button:last-child { border-radius: 0 6px 6px 0; }
+body.narrow { height: auto; min-height: 100%; }
+body.narrow #main { grid-template-columns: 1fr; overflow: visible; }
+body.narrow #main > * { overflow: visible; }
+body.narrow #tree, body.narrow #ref { border: none; }
+body.narrow #tree-handle, body.narrow #divider { display: none; }
+body.narrow:not(.has-sel) #editor, body.narrow:not(.has-sel) #ref { display: none; }
+body.narrow.has-sel #tree { display: none; }
+body.narrow.tab-body #ref, body.narrow.tab-related #editor { display: none; }
+body.narrow #editor, body.narrow #ref { padding: 14px 14px 48px; }
+body.narrow header { flex-wrap: wrap; }
+body.narrow header .dir, body.narrow #btn-abstract, body.narrow #btn-export, body.narrow #btn-import,
+body.narrow #btn-focus { display: none; }
+body.narrow #main > * { min-width: 0; }
+/* no width to spare for an ellipsis: titles wrap, and what a list row adds goes under it */
+body.narrow .row { padding-top: 7px; padding-bottom: 7px; white-space: normal; flex-wrap: wrap; }
+body.narrow .row .rid { overflow-wrap: anywhere; flex: 1 1 0; }
+body.narrow .row .meta, body.narrow .row .rsum { flex: 1 0 100%; margin-left: 14px; padding-left: 0; }
+body.narrow input, body.narrow textarea { font-size: 16px; }   /* below 16px iOS zooms the page on focus */
+body.login header > :not(h1) { display: none; }
+.card.login { text-align: left; }
+.card.login button.primary { width: 100%; padding: 8px; }
+
+@media (max-width: 900px) {
+  #ws-body { flex-direction: column; overflow: auto; }
+  #ws-editor { flex: none; }
+  #cols { flex: none; min-height: 50vh; }
+  #compare { grid-column: auto; }
+}
+dialog label.chk small { display: block; }
+</style>
+</head>
+<body>
+<header>
+  <h1>理論庫</h1>
+  <span class="dir muted" id="dir"></span>
+  <button id="btn-new">+ 新增理論</button>
+  <button id="btn-abstract">抽出上層</button>
+  <span class="spacer"></span>
+  <span id="status" class="muted"></span>
+  <span class="counts" id="counts"></span>
+  <span id="agent"></span>
+  <span id="sync" class="muted"></span>
+  <button id="btn-export" title="把所有理論打包成一個 zip 下載">匯出</button>
+  <button id="btn-import" title="從 zip 加入理論，匯入前會先列出會發生什麼">匯入</button>
+  <button id="btn-logout" title="忘記這支手機上的 GitHub token">登出</button>
+  <button id="focus-ref" title="專注時也顯示相關理論"></button>
+  <button id="focus-exit" title="離開專注（Esc）">離開專注</button>
+  <input type="file" id="import-file" accept=".zip,application/zip" hidden>
+</header>
+<div id="mbar"></div>
+<div id="main">
+  <nav id="tree">
+    <div id="tree-tools">
+      <div class="filter">
+        <input id="filter" placeholder="篩選標題或內文（按 / ）" aria-label="篩選理論" spellcheck="false">
+        <button id="filter-clear" title="清除篩選 (Esc)" hidden>×</button>
+      </div>
+      <div id="tree-switch" role="tablist"></div>
+      <div id="tree-kind"></div>
+      <div id="drop-root" hidden></div>
+    </div>
+    <div id="tree-rows"></div>
+  </nav>
+  <section id="editor"></section>
+  <aside id="ref"></aside>
+  <section id="compare" class="cols"></section>
+  <div id="tree-handle" title="拖曳調整寬度"></div>
+</div>
+<div id="nolib" class="center" style="display:none"></div>
+<div id="workspace">
+  <div id="ws-head"></div>
+  <div id="ws-body">
+    <div id="ws-editor"></div>
+    <div id="divider" title="拖曳調整寬度"></div>
+    <div id="cols" class="cols"></div>
+  </div>
+  <div id="ws-foot"></div>
+</div>
+<div id="bottombar"></div>
+<dialog id="dlg"></dialog>
+<div id="drag-hint" hidden></div>
+
+<script src="theory_lib.js"></script>
+<script>
+"use strict";
+const TOKEN = new URLSearchParams(location.search).get("k") || "";
+const $ = (s) => document.querySelector(s);
+
+// state ---------------------------------------------------------------------
+let lib = null;                 // what the server last said is on disk
+let selected = null;            // id open in the editor
+// what the editor DOM was built from; undefined until the first build, so the
+// "nothing selected" placeholder is drawn too
+let editorFor, editorHash = null;
+let focusCtx = {};              // {open: parent id} puts that parent first in the reference pane
+const drafts = {};              // id -> unsaved edits, always relative to `base`
+const timers = {}, inflight = {}, conflicts = {};
+const collapsed = new Set();
+let selMode = false;
+const picked = new Set();
+let view = "main";              // "main" | "abstract"
+let flow = null;                // {id, children} while the abstraction workspace is open
+let statusTimer = null;
+let filterText = "";            // tree filter box
+let filterKind = null;          // null | "error" | "warn" | "conflict": set from the header counts
+// the left column: "tree", or a flat list by "created" (newest first) or by "usage"
+let listMode = stored("theory-dag.list", "tree");
+let focusMode = stored("theory-dag.focus", "") === "1";     // tree and header put away
+let focusRef = stored("theory-dag.focus-ref", "1") === "1";  // related theories still shown
+let narrowTab = "body";         // phone-width layout: "body" | "related"
+let relatedEditing = null;      // id being edited inside the related pane
+const openCards = new Set();    // related cards the user unfolded, by section and id
+let dragging = null;            // {id, from} while a tree row is dragged
+
+function stored(key, fallback) {
+  try { const v = localStorage.getItem(key); return v === null ? fallback : v; } catch (_) { return fallback; }
+}
+function store(key, value) {
+  try { localStorage.setItem(key, value); } catch (_) { /* a per-browser nicety only */ }
+}
+// operations that change several files at once need the local server
+function multiFile() { return backend.mode === "server"; }
+
+// dom helper: strings become text nodes, never HTML
+function h(tag, props, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (v == null || v === false) continue;
+    if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (k === "class") el.className = v;
+    else if (k === "style") el.style.cssText = v;
+    else if (k in el && k !== "list") el[k] = v;
+    else el.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of kids.flat(9)) {
+    if (c == null || c === false) continue;
+    el.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  }
+  return el;
+}
+
+// replace host's children unless they would come out identical. Every save
+// re-renders the page; swapping an identical button or row under the mouse
+// swallows a click whose mousedown and mouseup straddle the swap.
+function swap(host, ...kids) {
+  const box = h("div", {}, kids);
+  if (host.dataset.html === box.innerHTML && host.childNodes.length) return;
+  host.dataset.html = box.innerHTML;
+  host.replaceChildren(...box.childNodes);
+}
+
+// server ----------------------------------------------------------------------
+// bumped by every write; a poll that started before a write finished carries
+// pre-write hashes and would flag the user's own save as a conflict
+let writeEpoch = 0, writesInFlight = 0;
+
+async function api(path, body) {
+  if (body !== undefined) { writeEpoch++; writesInFlight++; }
+  try { return await request(path, body); }
+  finally { if (body !== undefined) { writesInFlight--; writeEpoch++; } }
+}
+
+function request(path, body) { return backend.request(path, body); }
+
+function apiError(status, message, library) {
+  const e = new Error(message);
+  e.status = status;
+  e.library = library;
+  return e;
+}
+
+// the local server: the whole library, every operation, _TREE.md for the agent
+function serverBackend() {
+  return {
+    mode: "server", ready: true, pollMs: 2000,
+    async request(path, body) {
+      const r = await fetch("/api/" + path, {
+        method: body === undefined ? "GET" : "POST",
+        headers: { "X-Theory-Token": TOKEN, "Content-Type": "application/json" },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      let j = {};
+      try { j = await r.json(); } catch (_) { /* empty body */ }
+      if (!r.ok) throw apiError(r.status, j.error || "HTTP " + r.status, j.library);
+      return j;
+    },
+  };
+}
+
+// the phone: the same library read and written straight through the GitHub
+// API, one file per commit. Operations that change several files at once
+// (rename, abstract, delete, import) are left to the computer, where they are
+// atomic; the page hides them in this mode.
+const GITHUB_KEY = "theory-dag.github";
+const SINGLE_FILE_OPS = {
+  save: (n, b) => TheoryLib.save(n, b.id, b.body),
+  save_raw: (n, b) => TheoryLib.saveRaw(n, b.id, b.text),
+  create: (n, b) => TheoryLib.create(n, b.id, b.parents || []),
+  add_parent: (n, b) => TheoryLib.addParent(n, b.id, b.parent),
+  remove_parent: (n, b) => TheoryLib.removeParent(n, b.id, b.parent),
+  move_parent: (n, b) => TheoryLib.moveParent(n, b.id, b.from, b.to),
+  set_disabled: (n, b) => TheoryLib.setDisabled(n, b.id, b.disabled),
+};
+
+function githubBackend() {
+  let creds = null;
+  try { creds = JSON.parse(localStorage.getItem(GITHUB_KEY) || "null"); } catch (_) { /* storage blocked */ }
+  let files = null;                 // id -> {raw, hash}; hash is the blob sha GitHub checks writes against
+  let head = null;                  // the commit `files` reflects
+  // commits our own writes moved past: a read served from a lagging replica
+  // can still return one, and must not undo what was just saved
+  const superseded = new Set();
+
+  async function gh(method, url, body) {
+    const r = await fetch("https://api.github.com" + url, {
+      method, body: body && JSON.stringify(body),
+      headers: { Authorization: "Bearer " + creds.token, Accept: "application/vnd.github+json" },
+    });
+    let j = {};
+    try { j = await r.json(); } catch (_) { /* empty body */ }
+    if (!r.ok) {
+      const msg = r.status === 401 ? "token 無效或過期" : r.status === 404 ? "找不到倉庫，或 token 沒有它的權限" : (j.message || "HTTP " + r.status);
+      throw apiError(r.status, "GitHub：" + msg);
+    }
+    return j;
+  }
+
+  async function fetchAll() {
+    const [owner, name] = creds.repo.split("/");
+    const j = await gh("POST", "/graphql", { variables: { owner, name }, query:
+      "query($owner:String!,$name:String!){repository(owner:$owner,name:$name){defaultBranchRef{name target{oid" +
+      " ... on Commit{tree{entries{name type oid object{... on Blob{text isBinary isTruncated}}}}}}}}}" });
+    if (j.errors) throw apiError(400, "GitHub：" + j.errors.map((e) => e.message).join("；"));
+    const ref = j.data.repository && j.data.repository.defaultBranchRef;
+    if (!ref) throw apiError(400, "GitHub：倉庫是空的，先在電腦上把理論庫推上去");
+    if (superseded.has(ref.target.oid)) return;
+    if (head && head !== ref.target.oid) superseded.add(head);
+    head = ref.target.oid;
+    files = {};
+    for (const e of ref.target.tree.entries) {
+      if (e.type !== "blob" || !e.name.endsWith(".md") || "._".includes(e.name[0])) continue;
+      const b = e.object;
+      files[e.name.slice(0, -3)] = { raw: b.isBinary || b.isTruncated ? null : b.text, hash: e.oid };
+    }
+  }
+
+  function library() {
+    const nodes = TheoryLib.load(files);
+    return { dir: creds.repo, exists: true, nodes, rows: TheoryLib.treeRows(nodes),
+      descendants: TheoryLib.descendantsMap(nodes), install: { installed: true }, usage: null, sync: null };
+  }
+
+  function base64(text) {
+    const bytes = new TextEncoder().encode(text);
+    let s = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(s);
+  }
+
+  async function write(op, b) {
+    const nodes = TheoryLib.load(files);
+    let file;
+    try { file = SINGLE_FILE_OPS[op](nodes, b); }
+    catch (e) { throw apiError(e.status || 400, e.message, library()); }
+    const [owner, name] = creds.repo.split("/");
+    const sha = file.create ? undefined : b.base || (files[file.id] && files[file.id].hash);
+    let j;
+    try {
+      j = await gh("PUT", "/repos/" + owner + "/" + name + "/contents/" + encodeURIComponent(file.id + ".md"), {
+        message: "theory-dag（手機）：" + (file.create ? "新增 " : "修改 ") + file.id, content: base64(file.text), sha });
+    } catch (e) {
+      // 409 / 422: the sha we sent is no longer the file's, someone else saved it
+      if (e.status === 409 || e.status === 422) {
+        await fetchAll().catch(() => {});
+        throw apiError(409, file.id + " 在別處被改過了", library());
+      }
+      throw e;
+    }
+    superseded.add(head);
+    head = j.commit.sha;
+    files[file.id] = { raw: file.text, hash: j.content.sha };
+  }
+
+  return {
+    mode: "github", pollMs: 30000,
+    get ready() { return !!creds; },
+    async connect(repo, token) {
+      creds = { repo, token };
+      try { await fetchAll(); }
+      catch (e) { creds = null; throw e; }
+      try { localStorage.setItem(GITHUB_KEY, JSON.stringify(creds)); } catch (_) { /* this tab only */ }
+    },
+    disconnect() {
+      creds = null; files = null; head = null;
+      try { localStorage.removeItem(GITHUB_KEY); } catch (_) { /* storage blocked */ }
+    },
+    async request(path, body) {
+      if (path === "library") { await fetchAll(); return library(); }
+      if (path === "sync_now") { await fetchAll(); return {}; }
+      if (!SINGLE_FILE_OPS[path]) throw apiError(400, "這個操作要在電腦上做", files && library());
+      if (!files) await fetchAll();
+      await write(path, body);
+      return { library: library(), result: null };
+    },
+  };
+}
+
+const backend = TOKEN ? serverBackend() : githubBackend();
+
+// undo: {label, run}, offered beside the message for a while (a drag that went wrong)
+function setStatus(text, kind, undo) {
+  const s = $("#status");
+  s.replaceChildren(text);
+  if (undo) {
+    s.append(" ", h("button", { class: "link", onclick: async () => {
+      s.replaceChildren();
+      try { await undo.run(); setStatus("已復原", "ok"); }
+      catch (e) { setStatus("復原失敗：" + e.message, "err"); }
+    } }, undo.label || "復原"));
+  }
+  s.className = kind === "err" ? "err" : "muted";
+  clearTimeout(statusTimer);
+  if (kind === "ok") statusTimer = setTimeout(() => { s.replaceChildren(); }, undo ? 8000 : 2500);
+}
+
+function setLibrary(L) {
+  lib = L;
+  for (const id of Object.keys(drafts)) {
+    const n = lib.nodes[id];
+    if (!n) { delete drafts[id]; delete conflicts[id]; continue; }
+    if (n.hash !== drafts[id].base && !inflight[id]) conflicts[id] = true;
+  }
+  if (selected && !lib.nodes[selected]) selected = null;
+  render();
+}
+
+// drafts & autosave -------------------------------------------------------------
+function val(id) { return drafts[id] || lib.nodes[id]; }
+
+function edit(id, fn) {
+  const n = lib.nodes[id];
+  let d = drafts[id];
+  if (!d) {
+    d = drafts[id] = n.parsed
+      ? { base: n.hash, seq: 0, body: n.body }
+      : { base: n.hash, seq: 0, raw: n.raw };
+  }
+  fn(d);
+  d.seq++;
+  clearTimeout(timers[id]);
+  timers[id] = setTimeout(() => flush(id), 1000);
+  setStatus("有未儲存的修改…");
+}
+
+async function flush(id) {
+  clearTimeout(timers[id]);
+  delete timers[id];
+  while (inflight[id]) await inflight[id];
+  const d = drafts[id];
+  if (!d || conflicts[id]) return;
+  const seq = d.seq;
+  const [path, body] = d.raw !== undefined
+    ? ["save_raw", { id, base: d.base, text: d.raw }]
+    : ["save", { id, base: d.base, body: d.body }];
+  setStatus("儲存中…");
+  const job = (async () => {
+    try {
+      const j = await api(path, body);
+      const nn = j.library.nodes[id];
+      const wasRaw = d.raw !== undefined;
+      if (drafts[id] && drafts[id].seq === seq) delete drafts[id];
+      else if (drafts[id] && nn) drafts[id].base = nn.hash;
+      // keep the DOM the user is typing in, unless a raw fix just made the
+      // file readable again: then switch to the field editor
+      if (id === selected && nn && !(wasRaw && nn.parsed && !drafts[id])) editorHash = nn.hash;
+      delete inflight[id];
+      setLibrary(j.library);
+      setStatus("已儲存", "ok");
+    } catch (e) {
+      delete inflight[id];
+      if (e.status === 409) conflicts[id] = true;
+      setStatus((e.status === 409 ? "衝突：" : "儲存失敗：") + e.message, "err");
+      if (e.library) setLibrary(e.library); else render();
+    }
+  })();
+  inflight[id] = job;
+  await job;
+}
+
+async function flushAll() {
+  await Promise.all(Object.keys(drafts).map((id) => flush(id)));
+}
+
+// every structural change goes through here: pending text is saved first, so
+// the base hashes the request carries are the ones now on disk
+async function structural(path, makeBody) {
+  await flushAll();
+  const left = Object.keys(drafts);
+  if (left.length) {
+    throw new Error("還有沒存成功的修改（" + left.join("、") + "），請先處理");
+  }
+  try {
+    const j = await api(path, makeBody());
+    setLibrary(j.library);
+    return j;
+  } catch (e) {
+    if (e.library) setLibrary(e.library);
+    throw e;
+  }
+}
+
+// graph helpers (display only; the server re-checks everything) -----------------
+// in the order the tree lists them: the order taken in
+function childrenOf(p) {
+  return Object.values(lib.nodes).filter((n) => n.parents.includes(p))
+    .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity) || (a.id < b.id ? -1 : 1)).map((n) => n.id);
+}
+function dotFor(n) {
+  if (n.errors.length) return h("span", { class: "dot red", title: n.errors.join("\n") });
+  if (n.warnings.length) return h("span", { class: "dot orange", title: n.warnings.join("\n") });
+  return h("span", { class: "dot none" });
+}
+function commonParents(ids) {
+  if (!ids.length) return [];
+  return ids.map((id) => lib.nodes[id].parents)
+    .reduce((a, b) => a.filter((p) => b.includes(p)));
+}
+
+// render ------------------------------------------------------------------------
+const NARROW = window.matchMedia("(max-width: 900px)");
+
+function render() {
+  const narrow = NARROW.matches;
+  document.body.classList.toggle("narrow", narrow);
+  document.body.classList.toggle("login", !backend.ready);
+  if (!backend.ready) return renderLogin();
+  if (!lib) return;
+  const focus = focusApplies();
+  document.body.classList.toggle("focus", focus);
+  document.body.classList.toggle("noref", focus && !focusRef);
+  document.body.classList.toggle("has-sel", !!selected);
+  document.body.classList.toggle("tab-related", narrow && narrowTab === "related");
+  document.body.classList.toggle("tab-body", narrow && narrowTab !== "related");
+  renderHeader();
+  const noLib = !lib.exists;
+  $("#nolib").style.display = noLib ? "flex" : "none";
+  $("#main").style.display = !noLib && view === "main" ? "grid" : "none";
+  $("#workspace").classList.toggle("on", !noLib && view === "abstract");
+  if (noLib) return renderNoLib();
+  syncHash();
+  renderTree();
+  if (view === "abstract") renderWorkspace();
+  maybeRenderEditor();
+  renderBanner();
+  renderRef();
+  renderCompare();
+  renderBottombar();
+  renderMobileBar();
+  labelFocusButton();
+}
+
+// focus mode is the wide layout's: on a phone every screen is already one thing
+function focusApplies() {
+  return focusMode && !NARROW.matches && view === "main" && !selMode && !!selected;
+}
+
+// the editor is rebuilt only when its theory changes: its focus button follows the mode here
+function labelFocusButton() {
+  const fb = $("#btn-focus");
+  if (!fb) return;
+  fb.textContent = focusApplies() ? "離開專注" : "專注";
+  fb.title = focusApplies() ? "離開專注（Esc）" : "收起樹和頂列，只留這個理論";
+}
+
+function setFocusMode(on) {
+  focusMode = on;
+  store("theory-dag.focus", on ? "1" : "");
+  render();
+}
+
+// phone width, a theory open: back to the list, and the switch between its text and its relatives
+function renderMobileBar() {
+  const n = selected && lib.nodes[selected];
+  if (!NARROW.matches || !n) { swap($("#mbar")); return; }
+  const tab = (key, label) => h("button", { class: narrowTab === key ? "on" : null, role: "tab",
+    "aria-selected": String(narrowTab === key), onclick: () => { narrowTab = key; render(); } }, label);
+  swap($("#mbar"),
+    h("button", { class: "back", title: "回到清單", "aria-label": "回到清單", onclick: backToList }, "←"),
+    h("span", { class: "seg" }, tab("body", "內文"), tab("related", "相關")));
+}
+
+function backToList() {
+  // a theory opened from the list sits on top of it in the history: going back is the same as Back
+  if (history.state && history.state.opened) { history.back(); return; }
+  selected = null;
+  render();
+}
+
+function renderLogin() {
+  $("#main").style.display = "none";
+  $("#nolib").style.display = "flex";
+  const err = h("div", { class: "err" });
+  const repo = h("input", { placeholder: "帳號/倉庫名稱", autocapitalize: "off", spellcheck: false });
+  const token = h("input", { type: "password", placeholder: "github_pat_…", autocomplete: "off" });
+  const go = h("button", { class: "primary", onclick: async () => {
+    const r = repo.value.trim().replace(/^https:\/\/github\.com\//, "").replace(/\.git$/, "");
+    if (!/^[\w.-]+\/[\w.-]+$/.test(r)) { err.textContent = "倉庫要寫成 帳號/名稱"; return; }
+    if (!token.value.trim()) { err.textContent = "請貼上 token"; return; }
+    go.disabled = true; err.textContent = "";
+    try { await backend.connect(r, token.value.trim()); await poll(true); }
+    catch (e) { err.textContent = e.message; }
+    finally { go.disabled = false; }
+  } }, "連線");
+  $("#nolib").replaceChildren(h("div", { class: "card login" },
+    h("h2", { style: "margin-top:0" }, "連到你的理論庫"),
+    h("p", { class: "muted" }, "理論庫在電腦上同步到一個私有的 GitHub 倉庫，這裡直接讀寫它。"),
+    h("div", { class: "field" }, h("label", {}, "倉庫"), repo),
+    h("div", { class: "field" }, h("label", {}, "Token ",
+      h("small", {}, "到 GitHub 建一把 fine-grained token：只選這個倉庫，Contents 給 Read and write")), token),
+    h("p", {}, h("a", { href: "https://github.com/settings/personal-access-tokens/new", target: "_blank",
+      rel: "noopener" }, "建立 token ↗")),
+    h("p", { class: "muted" }, "token 只存在這個瀏覽器裡，不會送到 GitHub 以外的地方。"),
+    err, go));
+}
+
+function renderHeader() {
+  // the path matters only when something is wrong with it: last folder shown, full path on hover
+  $("#dir").textContent = libName();
+  $("#dir").title = lib.dir;
+  document.body.classList.toggle("selecting", selMode);
+  const busy = selMode || view === "abstract" || !lib.exists;
+  $("#btn-new").disabled = busy;
+  $("#btn-abstract").disabled = busy || Object.keys(lib.nodes).length < 2;
+  $("#btn-export").disabled = busy || !Object.keys(lib.nodes).length;
+  $("#btn-import").disabled = selMode || view === "abstract";
+  for (const b of ["#btn-abstract", "#btn-export", "#btn-import"]) $(b).hidden = !multiFile();
+  $("#btn-logout").hidden = backend.mode !== "github";
+  $("#focus-ref").textContent = focusRef ? "隱藏相關理論" : "顯示相關理論";
+  renderSync();
+  const nodes = Object.values(lib.nodes);
+  const red = nodes.filter((n) => n.errors.length).length;
+  const orange = nodes.filter((n) => !n.errors.length && n.warnings.length).length;
+  const clash = conflictIds().length;
+  // the last one fixed: nothing left to narrow to
+  if ((filterKind === "error" && !red) || (filterKind === "warn" && !orange)
+    || (filterKind === "conflict" && !clash)) filterKind = null;
+  // a count is also the way to those theories: pressing it narrows the tree to them
+  // (outside the main view there is no tree to narrow: plain text, not a dimmed button)
+  const count = (kind, n, color, label, title) => !n ? null : view !== "main"
+    ? h("span", { class: "count", title }, h("span", { class: "dot " + color }), n + " " + label)
+    : h("button", {
+      class: filterKind === kind ? "on" : null, "aria-pressed": String(filterKind === kind),
+      title: title + (filterKind === kind ? "（再按一次取消篩選）" : "（按一下只看這些）"),
+      onclick: () => setFilterKind(filterKind === kind ? null : kind),
+    }, h("span", { class: "dot " + color }), n + " " + label);
+  swap($("#counts"),
+    count("conflict", clash, "red", "同步衝突", "手機上和這裡都改過，要選一個版本"),
+    count("error", red, "red", "格式錯誤", "agent 可能讀錯這些理論"),
+    count("warn", orange, "orange", "未完成", "內文還是空的"));
+  // read-only: linking is done in the chat, where /theory-dag offers it
+  const agent = $("#agent");
+  agent.style.display = lib.exists && !lib.install.installed ? "" : "none";
+  agent.title = lib.install.claude_md + " 裡還沒有 " + lib.install.line;
+  swap(agent, h("span", { class: "dot orange" }), "agent 讀不到：回對話呼叫 /theory-dag 接上");
+}
+
+function libName() { return lib.dir.split(/[\\/]/).filter(Boolean).pop() || lib.dir; }
+
+function conflictIds() {
+  return lib.sync ? Object.keys(lib.sync.conflicts).filter((id) => lib.nodes[id]) : [];
+}
+
+const SYNC_LABEL = { syncing: "同步中…", pending: "有修改待同步", synced: "已同步", error: "同步失敗" };
+
+function renderSync() {
+  const s = $("#sync");
+  if (backend.mode === "github") {
+    s.textContent = "GitHub";
+    s.title = "直接讀寫 " + lib.dir + "；改名、抽出上層、刪除要在電腦上做";
+    return;
+  }
+  const st = lib.sync;
+  s.textContent = st ? SYNC_LABEL[st.state] || "" : "";
+  s.className = st && st.state === "error" ? "err" : "muted";
+  s.title = !st ? "" : st.state === "error" ? st.message
+    : "與 " + st.remote + " 同步" + (st.at ? "，上次 " + st.at.replace("T", " ") : "");
+}
+
+function renderNoLib() {
+  swap($("#nolib"), h("div", { class: "card" },
+    h("h2", { style: "margin-top:0" }, "還沒有理論庫"),
+    h("p", { class: "muted" }, "理論會存在這個資料夾，一個理論一個 .md 檔："),
+    h("p", {}, h("code", {}, lib.dir)),
+    h("p", { class: "muted" }, "想換位置的話，先設定環境變數 THEORY_DAG_DIR 再重開。"),
+    h("button", { class: "primary", onclick: async () => {
+      try { setLibrary((await api("init", {})).library); }
+      catch (e) { setStatus("建立失敗：" + e.message, "err"); }
+    } }, "建立理論庫"),
+    " ",
+    h("button", { title: "用別處匯出的 zip 建立理論庫", onclick: () => $("#import-file").click() }, "從 zip 匯入")));
+}
+
+// the text the filter reads besides the title: the body as being typed, or the raw file
+function textOf(id) {
+  const v = val(id);
+  return (v.body !== undefined ? v.body : v.raw) || "";
+}
+
+function matchesFilter(n) {
+  if (filterKind === "conflict" && !conflictIds().includes(n.id)) return false;
+  if (filterKind === "error" && !n.errors.length) return false;
+  if (filterKind === "warn" && (n.errors.length || !n.warnings.length)) return false;
+  const q = filterText.trim().toLowerCase();
+  return !q || n.id.toLowerCase().includes(q) || textOf(n.id).toLowerCase().includes(q);
+}
+
+// a theory found by its body alone shows where: otherwise the match looks arbitrary
+function bodySnippet(id) {
+  const q = filterText.trim().toLowerCase();
+  if (!q || id.toLowerCase().includes(q)) return "";
+  const t = textOf(id).replace(/\s+/g, " ");
+  const i = t.toLowerCase().indexOf(q);
+  if (i < 0) return "";
+  const from = Math.max(0, i - 10);
+  return (from ? "…" : "") + t.slice(from, i + q.length + 30);
+}
+
+function setFilterKind(kind) {
+  filterKind = kind;
+  renderHeader();
+  renderTree();
+}
+
+function setFilterText(text) {
+  filterText = text;
+  if ($("#filter").value !== text) $("#filter").value = text;
+  $("#filter-clear").hidden = !text;
+  renderTree();
+}
+
+// rows left by the filter: the matches, the open theory (so it never vanishes
+// mid-edit), and the ancestors on their path, which are only context
+function filteredRows() {
+  const rows = lib.rows;
+  const keep = new Set(), hits = new Set();
+  rows.forEach((r, i) => {
+    if (r.marker) return;
+    const hit = matchesFilter(lib.nodes[r.id]);
+    if (!hit && r.id !== selected) return;
+    if (hit) hits.add(r.key);
+    keep.add(r.key);
+    let d = r.depth;
+    for (let j = i - 1; j >= 0 && d > 0; j--) {
+      if (rows[j].depth < d) { keep.add(rows[j].key); d = rows[j].depth; }
+    }
+  });
+  return { rows: rows.filter((r) => keep.has(r.key)), hits };
+}
+
+function renderTree() {
+  const host = $("#tree-rows");
+  const kindLabel = { error: "格式錯誤", warn: "未完成", conflict: "同步衝突" }[filterKind];
+  swap($("#tree-kind"), kindLabel ? h("span", { class: "chip" }, "只看" + kindLabel,
+    h("button", { title: "取消這個篩選", onclick: () => setFilterKind(null) }, "×")) : null);
+  // the usage counts come from this computer's transcripts: the phone has none
+  const modes = [["tree", "樹狀"], ["created", "收錄時間"]].concat(multiFile() ? [["usage", "使用次數"]] : []);
+  if (!modes.some(([m]) => m === listMode)) listMode = "tree";
+  swap($("#tree-switch"), modes.map(([m, label]) => h("button", {
+    class: listMode === m ? "on" : null, role: "tab", "aria-selected": String(listMode === m),
+    onclick: () => { listMode = m; store("theory-dag.list", m); renderTree(); revealSelected(); },
+  }, label)));
+  if (!lib.rows.length) {
+    swap(host, h("div", { class: "tree-empty muted" }, "還沒有理論。按「+ 新增理論」開始。"));
+    return;
+  }
+  if (listMode !== "tree") return renderList(host);
+  const filtering = !!(filterText.trim() || filterKind);
+  const { rows, hits } = filtering ? filteredRows() : { rows: lib.rows, hits: null };
+  const out = [];
+  // the open theory stays listed, so "no match" has to be said, not inferred
+  if (hits && !hits.size) out.push(h("div", { class: "tree-empty muted" }, "沒有符合的理論。"));
+  let hideBelow = Infinity;
+  rows.forEach((r, i) => {
+    if (r.depth > hideBelow) return;
+    hideBelow = Infinity;
+    const pad = "padding-left:" + (10 + r.depth * 16) + "px";
+    if (r.marker) {
+      out.push(h("div", { class: "row marker", style: pad }, "接不上根節點（循環）"));
+      return;
+    }
+    const n = lib.nodes[r.id];
+    const hasKids = i + 1 < rows.length && rows[i + 1].depth > r.depth && !rows[i + 1].marker;
+    // while filtering every path to a match stays open; folding comes back with the full tree
+    const canFold = hasKids && !filtering;
+    const isCollapsed = canFold && collapsed.has(r.key);
+    if (isCollapsed) hideBelow = r.depth;
+    const caret = h("span", { class: "caret" + (canFold ? " has" : ""),
+      title: canFold ? (isCollapsed ? "展開" : "收合") : null, onclick: (ev) => {
+      ev.stopPropagation();
+      if (!canFold) return;
+      if (collapsed.has(r.key)) collapsed.delete(r.key); else collapsed.add(r.key);
+      renderTree();
+    } }, hasKids ? (isCollapsed ? "▸" : "▾") : "");
+    const s = hits && hits.has(r.key) ? bodySnippet(r.id) : "";
+    // the row stands for one edge: the theory under the parent it is listed beneath
+    const path = r.key.split("/");
+    const from = path.length > 1 && path[path.length - 2] !== "#cycle" ? path[path.length - 2] : null;
+    out.push(h("div", {
+      class: "row" + (r.id === selected && !selMode ? " sel" : "") + (selMode && picked.has(r.id) ? " sel" : "")
+        + (n.disabled ? " off" : "") + (hits && !hits.has(r.key) && r.id !== selected ? " ctx" : ""),
+      style: pad, title: r.id,
+      onclick: () => { if (selMode) togglePick(r.id); else navigate(r.id); },
+      draggable: !selMode && !NARROW.matches && n.parsed,
+      ondragstart: (ev) => startDrag(ev, r.id, from),
+      ondragend: endDrag,
+      ondragover: (ev) => overDrop(ev, r.id),
+      ondragleave: (ev) => ev.currentTarget.classList.remove("drop-ok", "drop-no"),
+      ondrop: (ev) => { ev.preventDefault(); dropOn(r.id, copyKey(ev)); },
+    },
+      caret,
+      selMode ? h("input", { type: "checkbox", checked: picked.has(r.id), tabIndex: -1,
+        onclick: (ev) => ev.preventDefault() }) : null,
+      dotFor(n),
+      h("span", { class: "rid" }, r.id),
+      n.disabled ? h("span", { class: "tag", title: "agent 看不到這個理論" }, "停用") : null,
+      s ? h("span", { class: "rsum" }, s) : null,
+      r.also.length ? h("span", { class: "also", title: "也在 " + r.also.join("、") + " 下" }, "↗") : null));
+  });
+  swap(host, out);
+}
+
+// flat lists for finding a theory by when it came in, or by how much agents use it
+function renderList(host) {
+  const usage = lib.usage || {};
+  const used = (id) => usage[id] || { reads: 0, sessions: 0, last: "" };
+  const ids = Object.keys(lib.nodes).filter((id) => matchesFilter(lib.nodes[id]) || id === selected);
+  const order = (id) => lib.nodes[id].order || 0;
+  const created = (id) => lib.nodes[id].created || "";
+  ids.sort(listMode === "created"
+    ? (a, b) => created(b).localeCompare(created(a)) || order(b) - order(a)
+    : (a, b) => used(b).sessions - used(a).sessions || used(b).reads - used(a).reads || order(b) - order(a));
+  const out = [];
+  if (listMode === "usage" && !lib.usage) out.push(h("div", { class: "tree-empty muted" }, "正在統計 agent 讀過的次數…"));
+  if (!ids.some((id) => matchesFilter(lib.nodes[id]))) out.push(h("div", { class: "tree-empty muted" }, "沒有符合的理論。"));
+  let group = null;
+  for (const id of ids) {
+    const n = lib.nodes[id], u = used(id);
+    const label = listMode === "created" ? dayLabel(n.created) : u.sessions ? "agent 讀過的" : "agent 還沒讀過的";
+    if (label !== group) { group = label; out.push(h("div", { class: "group" }, label)); }
+    const meta = listMode === "created"
+      ? (n.parents.length ? "在 " + n.parents[0] + " 下" : "根節點")
+      : u.sessions ? u.sessions + " 個 session・" + shortDay(u.last) : "";
+    const s = matchesFilter(n) ? bodySnippet(id) : "";
+    out.push(h("div", {
+      class: "row" + (id === selected ? " sel" : "") + (n.disabled ? " off" : ""),
+      title: id, onclick: () => navigate(id), style: "padding-left:12px",
+    }, dotFor(n), h("span", { class: "rid" }, id),
+    n.disabled ? h("span", { class: "tag", title: "agent 看不到這個理論" }, "停用") : null,
+    s ? h("span", { class: "rsum" }, s) : null,
+    meta ? h("span", { class: "meta", title: meta }, meta) : null));
+  }
+  swap(host, out);
+}
+
+function localDay(d) {
+  const pad = (x) => String(x).padStart(2, "0");
+  return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+}
+
+function dayLabel(day) {
+  if (!day) return "日期不明";
+  const now = new Date();
+  if (day === localDay(now)) return "今天";
+  if (day === localDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1))) return "昨天";
+  return day;
+}
+
+// a transcript timestamp (UTC) as the local day it was
+function shortDay(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return isNaN(d) ? "" : "最近 " + (d.getMonth() + 1) + "/" + d.getDate();
+}
+
+// drag a tree row onto another to move that edge there; with Ctrl (or Alt), add
+// one instead. The row dragged is one edge: the theory under the parent shown above it.
+function copyKey(ev) { return ev.ctrlKey || ev.altKey || ev.metaKey; }
+
+function startDrag(ev, id, from) {
+  dragging = { id, from };
+  ev.dataTransfer.effectAllowed = "copyMove";
+  ev.dataTransfer.setData("text/plain", id);
+  // Chrome cancels a drag whose dragstart changes the page: show the strip a tick later
+  setTimeout(() => {
+    if (!dragging) return;
+    const root = $("#drop-root");
+    root.hidden = !from;
+    root.textContent = "放到這裡：移出原本的父節點";
+  }, 0);
+}
+
+function endDrag() {
+  dragging = null;
+  $("#drag-hint").hidden = true;
+  $("#drop-root").hidden = true;
+  $("#drop-root").classList.remove("drop-ok");
+  document.querySelectorAll(".drop-ok, .drop-no").forEach((el) => el.classList.remove("drop-ok", "drop-no"));
+}
+
+// target null: the strip at the top of the tree, which drops the edge
+function dropVerdict(target, add) {
+  const { id, from } = dragging;
+  const n = lib.nodes[id];
+  // the titles are on screen already: the hint says only what the drop will do
+  if (target === null) {
+    return { ok: true, text: "放開：移出原本的父節點"
+      + (n.parents.filter((p) => p !== from).length ? "" : "，變成根節點") };
+  }
+  if (target === id) return { ok: false, text: "不能掛在自己下面" };
+  if ((lib.descendants[id] || []).includes(target)) return { ok: false, text: "不能掛在自己的子孫下面，會形成循環" };
+  if (n.parents.includes(target)) return { ok: false, text: "已經掛在這個理論下了" };
+  if (!from) return { ok: true, copy: true, text: "放開：掛到這個理論下" };
+  if (add) return { ok: true, copy: true, text: "放開：保留原本的父節點，再多掛到這個理論下（鬆開 Ctrl 改成移過來）" };
+  return { ok: true, text: "放開：從原本的父節點移到這個理論下（按住 Ctrl 改成保留原本的，再多加一個父節點）" };
+}
+
+function overDrop(ev, target) {
+  if (!dragging) return;
+  const v = dropVerdict(target, copyKey(ev));
+  const hint = $("#drag-hint");
+  hint.hidden = false;
+  hint.textContent = v.text;
+  hint.classList.toggle("no", !v.ok);
+  hint.style.left = Math.min(ev.clientX + 14, window.innerWidth - hint.offsetWidth - 8) + "px";
+  hint.style.top = ev.clientY + 18 + "px";
+  ev.currentTarget.classList.toggle("drop-ok", v.ok);
+  ev.currentTarget.classList.toggle("drop-no", !v.ok);
+  if (v.ok) { ev.preventDefault(); ev.dataTransfer.dropEffect = v.copy ? "copy" : "move"; }
+}
+
+async function dropOn(target, add) {
+  if (!dragging) return;
+  const v = dropVerdict(target, add);
+  const { id, from } = dragging;
+  endDrag();
+  if (!v.ok) return;
+  let change, undo, done;
+  if (target === null) {
+    change = ["remove_parent", { parent: from }]; undo = ["add_parent", { parent: from }];
+    done = "已把 " + id + " 移出 " + from;
+  } else if (v.copy) {
+    change = ["add_parent", { parent: target }]; undo = ["remove_parent", { parent: target }];
+    done = "已讓 " + id + " 同時掛在 " + target + " 下";
+  } else {
+    change = ["move_parent", { from, to: target }]; undo = ["move_parent", { from: target, to: from }];
+    done = "已把 " + id + " 從 " + from + " 移到 " + target + " 下";
+  }
+  const send = ([path, extra]) => structural(path, () => Object.assign({ id, base: lib.nodes[id].hash }, extra));
+  try {
+    await send(change);
+    setStatus(done, "ok", { run: () => send(undo) });
+  } catch (e) { setStatus("調整失敗：" + e.message, "err"); }
+}
+
+// opening a theory is a step in the browser history: Back returns to the one before
+// (on a phone, to the list)
+function navigate(id, focus) {
+  if (id !== selected) history.pushState({ opened: true }, "", location.pathname + location.search + "#" + encodeURIComponent(id));
+  narrowTab = "body";
+  select(id, focus);
+}
+
+function select(id, focus) {
+  selected = id;
+  focusCtx = {};
+  if (relatedEditing) { flush(relatedEditing); relatedEditing = null; }
+  syncHash();
+  render();
+  if (focus) renderEditor(focus);
+  revealSelected();
+  if (NARROW.matches) window.scrollTo(0, 0);
+}
+
+// the open theory lives in the URL hash, so a reload or a reopened tab comes back to it
+function syncHash() {
+  const want = selected ? "#" + encodeURIComponent(selected) : "";
+  if (location.hash !== want) history.replaceState(history.state, "", location.pathname + location.search + want);
+}
+
+function revealSelected() {
+  const row = $("#tree-rows .row.sel");
+  if (row) row.scrollIntoView({ block: "nearest" });   // no jump when it is already in view
+}
+
+function editorHost() { return view === "abstract" ? $("#ws-editor") : $("#editor"); }
+
+function maybeRenderEditor() {
+  const n = selected && lib.nodes[selected];
+  if (editorFor !== selected || (n && !drafts[selected] && n.hash !== editorHash)) renderEditor();
+}
+
+function autosize(t) { t.style.height = "auto"; t.style.height = t.scrollHeight + 2 + "px"; }
+
+function renderEditor(focus) {
+  const host = editorHost();
+  // only one editor may exist: ids like #f-body and #ed-banner are looked up globally
+  (host.id === "editor" ? $("#ws-editor") : $("#editor")).replaceChildren();
+  editorFor = selected;
+  const n = selected && lib.nodes[selected];
+  editorHash = n ? n.hash : null;
+  if (!n) {
+    host.replaceChildren(h("div", { class: "muted" }, Object.keys(lib.nodes).length
+      ? "從左邊挑一個理論來編輯。" : "按「+ 新增理論」收錄第一個理論。"));
+    return;
+  }
+  const id = n.id, v = val(id);
+  const hint = h("div", { class: "ed-hint" });
+  // the controls get a row of their own above the title: a long title takes the
+  // full width, and they stay put however many lines it wraps to
+  const parts = [h("div", { class: "ed-bar" },
+    n.disabled ? h("span", { class: "tag off-tag" }, "停用中・agent 看不到") : null,
+    n.parsed ? h("label", { class: "switch", title: "停用的理論不會出現在 agent 看到的樹裡；子節點照常可見" },
+      h("input", { type: "checkbox", checked: !n.disabled, "aria-label": "agent 可見",
+        onchange: (ev) => toggleDisabled(id, !ev.target.checked) }),
+      "agent 可見") : null,
+    view === "main" ? h("button", { title: "新增一個掛在 " + id + " 下的理論",
+      onclick: () => openCreateDialog([id]) }, "+ 子理論") : null,
+    multiFile() ? h("button", { class: "ghost-danger", onclick: () => openDeleteDialog(id) }, "刪除") : null,
+    view === "main" ? h("button", { id: "btn-focus", onclick: () => setFocusMode(!focusMode) }, "專注") : null,
+    h("span", { class: "ed-meta" }, metaLine(n))),
+    // a rename rewrites the children's parents too, several files at once: computer only
+    n.parsed && multiFile() ? titleInput(id, hint) : h("h2", { class: "ed-title" }, id),
+    n.parsed && multiFile() ? hint : null,
+    h("div", { id: "ed-banner" })].filter(Boolean);
+  const areas = [];
+  const area = (value, onfocus, oninput, extra) => {
+    const t = h("textarea", Object.assign({ value, onfocus, oninput: (ev) => { autosize(ev.target); oninput(ev.target.value); } }, extra || {}));
+    areas.push(t);
+    return t;
+  };
+  if (!n.parsed) {
+    parts.push(area(v.raw, () => {}, (x) => edit(id, (d) => { d.raw = x; }), { class: "raw", spellcheck: false }));
+  } else {
+    parts.push(h("div", { class: "field" }, h("label", {}, "父節點"), parentChips(n)));
+    // one body: the whole theory, self-contained. What it shares with a parent is
+    // already written in that parent's file, shown alongside in the reference pane.
+    parts.push(h("div", { class: "field" },
+      h("label", { for: "f-body" }, "內文 ", h("small", { class: "focus-hint" }, n.parents.length
+        ? "完整寫下這個理論；和父節點共用的結構照樣寫進來，讀這一份就夠用"
+        : "完整寫下這個理論")),
+      // an empty body is what makes a theory unfinished: said here, where it gets written
+      area(v.body, () => {}, (x) => { edit(id, (d) => { d.body = x; }); if (filterText) renderTree(); },
+        { id: "f-body", class: "body", placeholder: "還沒有內文，樹上會標成未完成" })));
+  }
+  host.replaceChildren(...parts);
+  areas.forEach(autosize);
+  const title = host.querySelector("textarea.ed-title");
+  if (title) autosize(title);
+  renderBanner();
+  labelFocusButton();
+  if (focus && focus.body) {
+    const t = $("#f-body");
+    if (t) { t.focus(); setFocus({ open: focus.open }); }
+  }
+}
+
+// when it came in, and whether agents use it: what the theory has been worth so far
+function metaLine(n) {
+  const out = [];
+  if (n.created) out.push("收錄於 " + n.created);
+  if (lib.usage) {
+    const u = lib.usage[n.id];
+    out.push(u ? "agent 在 " + u.sessions + " 個 session 讀過 " + u.reads + " 次・" + shortDay(u.last) : "agent 還沒讀過");
+  }
+  return out.join("・");
+}
+
+const TITLE_HINT_SHORT ="說明何時該選這個理論、和兄弟差在哪；也是檔名，之後可以改";
+const TITLE_EDITING = "說明何時該選這個理論、和兄弟差在哪。Enter 改名，Esc 取消";
+
+// the title in place: Enter or leaving the field renames, Esc puts it back.
+// A rename rewrites the children's parents too, so it is a structural change.
+// A textarea so a long title wraps; it still holds one line, the id
+function titleInput(id, hint) {
+  let busy = false;
+  const say = (text, err) => { hint.textContent = text; hint.classList.toggle("err", !!err); };
+  const problem = (x) => {
+    if (!x) return "標題不能是空的";
+    if (/^[._]/.test(x)) return "標題不能以 . 或 _ 開頭";
+    if (/[\\/:*?"<>|\[\],#]/.test(x)) return "標題不能包含 \\ / : * ? \" < > | [ ] , #";
+    if (Object.keys(lib.nodes).some((k) => k !== id && k.toLowerCase() === x.toLowerCase())) return "已經有叫 " + x + " 的理論了";
+    return "";
+  };
+  const input = h("textarea", { class: "ed-title", value: id, rows: 1, spellcheck: false, "aria-label": "標題",
+    title: "點一下改標題",
+    onfocus: () => say(TITLE_EDITING),
+    oninput: () => {
+      // a pasted line break would end up in the file name
+      if (/[\r\n]/.test(input.value)) input.value = input.value.replace(/\s*[\r\n]+\s*/g, " ");
+      autosize(input);
+      const p = problem(input.value.trim()); say(p || TITLE_EDITING, p);
+    },
+    onkeydown: (ev) => {
+      if (ev.isComposing) return;      // Enter that picks an IME candidate is not a rename
+      if (ev.key === "Enter") { ev.preventDefault(); commit(); }
+      else if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); input.value = id; autosize(input); say(""); input.blur(); }
+    },
+    onblur: () => { if (input.value.trim() === id) { input.value = id; autosize(input); say(""); } else commit(); },
+  });
+  // the wrap changes with the column width (window size, the splitters)
+  let width = 0;
+  new ResizeObserver(() => {
+    if (input.offsetWidth !== width) { width = input.offsetWidth; autosize(input); }
+  }).observe(input);
+  const commit = async () => {
+    const x = input.value.trim();
+    if (busy || x === id) return;
+    const p = problem(x);
+    if (p) { say(p, true); return; }
+    busy = true;
+    try { await renameTheory(id, x); setStatus("已改名為 " + x, "ok"); }
+    catch (e) { say("改名失敗：" + e.message, true); }
+    finally { busy = false; }
+  };
+  return input;
+}
+
+async function renameTheory(id, newId) {
+  await structural("rename", () => ({ id, base: lib.nodes[id].hash, new_id: newId,
+    children: childrenOf(id).map((c) => ({ id: c, base: lib.nodes[c].hash })) }));
+  // the same theory under a new name: whatever pointed at it follows (the
+  // library update just now dropped the selection, the old id being gone)
+  selected = newId;
+  if (flow) {
+    if (flow.id === id) flow.id = newId;
+    flow.children = flow.children.map((c) => (c === id ? newId : c));
+  }
+  editorFor = undefined;
+  render();
+}
+
+function renderBanner() {
+  const slot = $("#ed-banner");
+  const n = selected && lib.nodes[selected];
+  if (!slot || !n) return;
+  // the usage count arrives after the editor is built, and keeps changing
+  const meta = editorHost().querySelector(".ed-meta");
+  if (meta) meta.textContent = metaLine(n);
+  const out = [];
+  const remote = lib.sync ? lib.sync.conflicts[n.id] : undefined;
+  if (remote !== undefined) {
+    const theirs = TheoryLib.parse(n.id, remote);
+    const resolve = async (keep) => {
+      try {
+        await structural("resolve_conflict", () => ({ id: n.id, keep, base: lib.nodes[n.id].hash }));
+        setStatus(keep === "theirs" ? "已改用手機上的版本" : "已保留這裡的版本", "ok");
+      } catch (e) { setStatus("處理失敗：" + e.message, "err"); }
+    };
+    out.push(h("div", { class: "banner red" },
+      "這個理論在手機上也被改過。現在顯示的是這台電腦的版本，手機上的版本在下面：",
+      h("details", { class: "theirs" }, h("summary", {}, "手機上的版本"),
+        theirs.parsed ? md(theirs.body) : h("pre", {}, remote)),
+      h("div", { class: "actions" },
+        h("button", { onclick: () => resolve("theirs") }, "改用手機上的版本"),
+        h("button", { onclick: () => resolve("mine") }, "保留這裡的版本"))));
+  }
+  if (conflicts[n.id]) {
+    out.push(h("div", { class: "banner red" },
+      "這個檔案在別處被改過了，你的修改還沒存。",
+      h("div", { class: "actions" },
+        h("button", { onclick: () => { delete drafts[n.id]; delete conflicts[n.id]; renderEditor(); setStatus(""); } }, "載入磁碟上的版本"),
+        h("button", { onclick: () => { drafts[n.id].base = lib.nodes[n.id].hash; delete conflicts[n.id]; renderBanner(); flush(n.id); } }, "用我的版本覆蓋"))));
+  }
+  if (n.errors.length) {
+    out.push(h("div", { class: "banner red" },
+      n.parsed ? "格式錯誤：" : "這個檔案的格式不符，請直接修改下面的原始文字，存檔後會重新檢查：",
+      h("ul", {}, n.errors.map((e) => h("li", {}, e)))));
+  }
+  swap(slot, out);
+}
+
+function parentChips(n) {
+  const box = h("div", { class: "chips" });
+  for (const p of n.parents) {
+    box.append(h("span", { class: "chip" }, p, h("button", {
+      title: "移除這條邊（內文不受影響）",
+      onclick: async () => {
+        try {
+          await structural("remove_parent", () => ({ id: n.id, base: lib.nodes[n.id].hash, parent: p }));
+          renderEditor();
+        } catch (e) { setStatus("移除失敗：" + e.message, "err"); }
+      } }, "×")));
+  }
+  const add = h("button", { onclick: () => {
+    const blocked = new Set([n.id, ...n.parents, ...(lib.descendants[n.id] || [])]);
+    const pk = picker(() => Object.keys(lib.nodes).filter((x) => !blocked.has(x)),
+      async (p) => {
+        try {
+          await structural("add_parent", () => ({ id: n.id, base: lib.nodes[n.id].hash, parent: p }));
+          // the new parent opens beside the body: what the theory now shares is written there
+          renderEditor({ body: true, open: p });
+        } catch (e) { setStatus("加入失敗：" + e.message, "err"); renderEditor(); }
+      },
+      () => pk.replaceWith(add));
+    add.replaceWith(pk);
+    pk.querySelector("input").focus();
+  } }, "+ 加父節點");
+  box.append(add);
+  return box;
+}
+
+// autocomplete over existing ids; candidates() is re-read on every keystroke
+function picker(candidates, onPick, onCancel) {
+  let hi = 0, items = [];
+  const input = h("input", { placeholder: "輸入標題搜尋" });
+  const list = h("ul");
+  const wrap = h("div", { class: "picker" }, input, list);
+  const refresh = () => {
+    const q = input.value.trim().toLowerCase();
+    items = candidates().filter((id) => !q || id.toLowerCase().includes(q)).sort();
+    hi = Math.min(hi, Math.max(items.length - 1, 0));
+    list.replaceChildren(...(items.length ? items.map((id, i) => h("li", {
+      class: i === hi ? "hi" : "",
+      onmousedown: (ev) => { ev.preventDefault(); onPick(id); },
+    }, id)) : [h("li", { class: "muted" }, "沒有可選的理論")]));
+  };
+  input.addEventListener("input", () => { hi = 0; refresh(); });
+  input.addEventListener("keydown", (ev) => {
+    if (ev.key === "ArrowDown") { hi = Math.min(hi + 1, items.length - 1); refresh(); ev.preventDefault(); }
+    else if (ev.key === "ArrowUp") { hi = Math.max(hi - 1, 0); refresh(); ev.preventDefault(); }
+    else if (ev.key === "Enter") { if (items[hi]) onPick(items[hi]); ev.preventDefault(); }
+    else if (ev.key === "Escape") { ev.stopPropagation(); ev.preventDefault(); onCancel(); }
+  });
+  input.addEventListener("blur", () => setTimeout(() => { if (wrap.isConnected) onCancel(); }, 0));
+  refresh();
+  return wrap;
+}
+
+function setFocus(ctx) { focusCtx = ctx; renderRef(); }
+
+// a small markdown subset for read-only views: headings, lists, code, bold.
+// Builds DOM nodes, never HTML strings, so theory text cannot inject markup.
+function md(text) {
+  const box = h("div", { class: "md" });
+  const inline = (s) => {
+    const out = [];
+    const re = /(`[^`]+`|\*\*[^*]+\*\*)/g;
+    let last = 0, m;
+    while ((m = re.exec(s))) {
+      if (m.index > last) out.push(s.slice(last, m.index));
+      out.push(m[0][0] === "`" ? h("code", {}, m[0].slice(1, -1)) : h("strong", {}, m[0].slice(2, -2)));
+      last = re.lastIndex;
+    }
+    out.push(s.slice(last));
+    return out;
+  };
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  let para = [], list = null;
+  const flush = () => {
+    if (para.length) box.append(h("p", {}, inline(para.join("\n"))));
+    para = [];
+    list = null;
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    let m;
+    if (/^\s*```/.test(line)) {
+      flush();
+      const code = [];
+      while (++i < lines.length && !/^\s*```/.test(lines[i])) code.push(lines[i]);
+      box.append(h("pre", {}, h("code", {}, code.join("\n"))));
+    } else if ((m = /^(#{1,6})\s+(.*)$/.exec(line))) {
+      flush();
+      box.append(h("h" + m[1].length, {}, inline(m[2])));
+    } else if ((m = /^\s*(?:[-*+]|(\d+)\.)\s+(.*)$/.exec(line))) {
+      if (para.length) { box.append(h("p", {}, inline(para.join("\n")))); para = []; }
+      const tag = m[1] ? "ol" : "ul";
+      if (!list || list.tagName.toLowerCase() !== tag) { list = h(tag); box.append(list); }
+      list.append(h("li", {}, inline(m[2])));
+    } else if (!line.trim()) {
+      flush();
+    } else {
+      list = null;
+      para.push(line);
+    }
+  }
+  flush();
+  box.style.whiteSpace = "pre-line";
+  return box;
+}
+
+function nodeView(id) {
+  const n = lib.nodes[id];
+  if (!n) return h("div", { class: "muted" }, id + " 不存在");
+  const v = val(id);
+  if (!n.parsed) return h("div", { class: "view" }, h("div", { class: "txt" }, v.raw));
+  return h("div", { class: "view" },
+    v.body && v.body.trim() ? md(v.body) : h("div", { class: "muted" }, "（內文是空的）"));
+}
+
+// every way down from a root to id, as lists of ids (a few at most: a theory has few parents)
+function pathsTo(id, seen = new Set()) {
+  const ps = lib.nodes[id].parents.filter((p) => lib.nodes[p] && !seen.has(p));
+  if (!ps.length) return [[id]];
+  const next = new Set(seen).add(id);
+  return ps.flatMap((p) => pathsTo(p, next)).slice(0, 8).map((path) => [...path, id]);
+}
+
+// The theory's place and the theories a rewrite may ripple into: its parents
+// (the skeleton it refines, open), its children (they refine it) and its siblings
+// (what sets it apart), the last two folded to their titles. Each can be edited
+// right here, beside the theory that prompted the change.
+function renderRef(force) {
+  if (view !== "main") return;
+  // a card being typed in must keep its textarea: the pane holds still until it is done
+  if (!force && relatedEditing && $("#ref").contains(document.activeElement)) return;
+  const host = $("#ref");
+  const n = selected && lib.nodes[selected];
+  let out;
+  if (!n) out = [h("div", { class: "muted" }, "選了理論之後，這裡會顯示它在理論庫裡的位置和相關的理論。")];
+  else if (!n.parsed) out = [h("div", { class: "muted" }, "修好格式之後，這裡會顯示相關的理論。")];
+  else {
+    const kids = childrenOf(n.id);
+    const sibs = n.parents.filter((p) => lib.nodes[p])
+      .map((p) => [p, childrenOf(p).filter((c) => c !== n.id)]).filter(([, cs]) => cs.length);
+    const nSibs = new Set(sibs.flatMap(([, cs]) => cs)).size;
+    out = [h("div", { class: "ref-title" }, "相關理論")];
+    out.push(h("div", { class: "rel-sec" }, h("h4", {}, "位置"),
+      pathsTo(n.id).map((path) => h("div", { class: "crumbs" }, path.map((p, i) => [
+        i ? h("span", { class: "sep" }, "›") : null,
+        p === n.id ? h("b", {}, p) : h("a", { href: "#" + encodeURIComponent(p), onclick: (ev) => { ev.preventDefault(); navigate(p); } }, p)])))));
+    // a just-added parent comes first, so it is what the eye lands on
+    const parents = focusCtx.open ? [focusCtx.open, ...n.parents.filter((p) => p !== focusCtx.open)] : n.parents;
+    out.push(h("div", { class: "rel-sec" }, h("h4", {}, "父節點 ", h("small", {}, "和兄弟共享的骨架")),
+      parents.length ? parents.map((p) => relatedCard("parent", p, true)) : h("div", { class: "muted" }, "這是根節點。")));
+    out.push(h("div", { class: "rel-sec" }, h("h4", {}, "子節點 " + kids.length, h("small", {}, " 改了骨架，這些可能要跟著改")),
+      kids.length ? kids.map((c) => relatedCard("child", c, false)) : h("div", { class: "muted" }, "沒有子節點。")));
+    out.push(h("div", { class: "rel-sec" }, h("h4", {}, "兄弟 " + nSibs, h("small", {}, " 確認差異還成立")),
+      sibs.length ? sibs.map(([p, cs]) => [
+        n.parents.length > 1 ? h("div", { class: "under muted" }, "在 " + p + " 下") : null,
+        cs.map((c) => relatedCard("sib:" + p, c, false))]) : h("div", { class: "muted" }, "沒有兄弟。")));
+  }
+  swap(host, out);      // unchanged content keeps its scroll position and open <details>
+}
+
+function relatedCard(section, id, openByDefault) {
+  const n = lib.nodes[id];
+  if (!n) return h("div", { class: "muted" }, id + " 不存在");
+  const key = section + "\n" + id;
+  const editing = relatedEditing === id;
+  const open = editing || (openByDefault ? !openCards.has("-" + key) : openCards.has(key));
+  const body = editing
+    ? h("textarea", { class: "rel-edit", value: val(id).body, "aria-label": id + " 的內文",
+      oninput: (ev) => { autosize(ev.target); edit(id, (d) => { d.body = ev.target.value; }); } })
+    : nodeView(id);
+  const card = h("details", { class: "rel" + (editing ? " editing" : ""), open,
+    ontoggle: (ev) => {
+      // remembered both ways: a parent folded stays folded, a child unfolded stays open
+      openCards.delete(key); openCards.delete("-" + key);
+      if (ev.target.open !== openByDefault) openCards.add(openByDefault ? "-" + key : key);
+    } },
+  h("summary", {},
+    h("a", { class: "go", href: "#" + encodeURIComponent(id), title: "打開 " + id,
+      onclick: (ev) => { ev.preventDefault(); navigate(id); } }, id),
+    conflicts[id] ? h("span", { class: "tag", title: "有沒存成功的修改，打開它來處理" }, "衝突") : null,
+    n.parsed ? h("button", { class: "small", title: editing ? "收起編輯，回到唯讀" : "在這裡直接改它的內文",
+      onclick: (ev) => { ev.preventDefault(); editRelated(editing ? null : id); } }, editing ? "完成" : "改") : null),
+  body);
+  if (editing) requestAnimationFrame(() => { const t = card.querySelector("textarea"); if (t && t.isConnected) autosize(t); });
+  return card;
+}
+
+async function editRelated(id) {
+  const was = relatedEditing;
+  relatedEditing = id;
+  if (was) await flush(was);
+  renderRef(true);
+  if (id) {
+    const t = $("#ref textarea.rel-edit");
+    if (t) { autosize(t); t.focus(); }
+  }
+}
+
+// bottom bar: only selection mode uses it ------------------------------------------
+function renderBottombar() {
+  const bar = $("#bottombar");
+  if (selMode) {
+    bar.classList.add("on");
+    swap(bar,
+      h("span", {}, "勾選要抽出共同上層的理論：已選 " + picked.size + " 個（至少 2 個）"),
+      h("span", { class: "spacer" }),
+      h("button", { onclick: cancelSelect }, "取消"),
+      h("button", { class: "primary", disabled: picked.size < 2, onclick: openAbstractDialog }, "下一步"));
+    return;
+  }
+  bar.classList.remove("on");
+}
+
+function cancelSelect() { selMode = false; picked.clear(); render(); }
+
+function togglePick(id) {
+  const adding = !picked.has(id);
+  if (adding) picked.add(id); else picked.delete(id);
+  render();
+  if (adding) $("#compare").scrollLeft = 0;     // its column is the first one
+}
+
+// what decides the picks is whether the theories share a skeleton, so the
+// picked ones sit side by side; the newest first, right next to the tree
+function renderCompare() {
+  if (!selMode) return;
+  const host = $("#compare");
+  const ids = [...picked].reverse().filter((id) => lib.nodes[id]);
+  host.style.setProperty("--ncols", Math.max(ids.length, 1));
+  swap(host, ids.length
+    ? ids.map((id) => h("div", { class: "col" },
+      h("h3", {}, id, h("small", {}, "唯讀"),
+        h("button", { title: "取消勾選", onclick: () => togglePick(id) }, "×")),
+      nodeView(id)))
+    : h("div", { class: "muted" }, "勾選的理論會並排顯示在這裡，方便比對它們共享的結構。"));
+}
+
+// dialogs -----------------------------------------------------------------------
+function openDialog(...kids) {
+  const dlg = $("#dlg");
+  dlg.replaceChildren(...kids.filter((k) => k != null && k !== false));
+  dlg.showModal();
+  return dlg;
+}
+
+function openCreateDialog(parents) {
+  const chosen = [...(parents || [])];
+  const err = h("div", { class: "err" });
+  const idIn = h("input", { placeholder: "例如：高斯誤差下的最小平方" });
+  const chips = h("div", { class: "chips" });
+  const drawChips = () => {
+    chips.replaceChildren(...chosen.map((p) => h("span", { class: "chip" }, p,
+      h("button", { type: "button", onclick: () => { chosen.splice(chosen.indexOf(p), 1); drawChips(); } }, "×"))));
+    const add = h("button", { type: "button", onclick: () => {
+      const pk = picker(() => Object.keys(lib.nodes).filter((x) => !chosen.includes(x)),
+        (p) => { chosen.push(p); drawChips(); }, () => drawChips());
+      add.replaceWith(pk);
+      pk.querySelector("input").focus();
+    } }, "+ 加父節點");
+    chips.append(add);
+  };
+  drawChips();
+  const check = () => {
+    const x = idIn.value.trim();
+    if (!x) return "請輸入標題";
+    if (Object.keys(lib.nodes).some((k) => k.toLowerCase() === x.toLowerCase())) return "已經有叫 " + x + " 的理論了";
+    return "";
+  };
+  idIn.addEventListener("input", () => { err.textContent = idIn.value ? check() : ""; });
+  const submit = async () => {
+    const msg = check();
+    if (msg) { err.textContent = msg; return; }
+    const id = idIn.value.trim();
+    try {
+      await structural("create", () => ({ id, parents: chosen }));
+      $("#dlg").close();
+      navigate(id, { body: true });
+    } catch (e) { err.textContent = e.message; }
+  };
+  idIn.addEventListener("keydown", (ev) => { if (ev.key === "Enter") submit(); });
+  openDialog(
+    h("h3", {}, "新增理論"),
+    h("div", { class: "field" }, h("label", {}, "標題 ", h("small", {}, TITLE_HINT_SHORT)), idIn),
+    h("div", { class: "field" }, h("label", {}, "父節點 ", h("small", {}, "選填：已經知道它是誰的特例，就先掛上去")), chips),
+    err,
+    h("div", { class: "foot" },
+      h("button", { onclick: () => $("#dlg").close() }, "取消"),
+      h("button", { class: "primary", onclick: submit }, "建立")));
+  idIn.focus();
+}
+
+function openAbstractDialog() {
+  const ids = Object.keys(lib.nodes).filter((x) => picked.has(x)).sort();
+  const common = commonParents(ids);
+  const err = h("div", { class: "err" });
+  const idIn = h("input", { placeholder: "說明這組理論共通的適用情境" });
+  // the choice is where the new theory hangs; what that does to the old edges is the fine print
+  const boxes = common.map((r) => ({ r, cb: h("input", { type: "checkbox", checked: true }), note: h("small") }));
+  const relabel = () => {
+    const a = idIn.value.trim() || "新理論";
+    for (const b of boxes) {
+      b.note.textContent = ids.join("、") + " 不再直接掛在 " + b.r + " 下，改經由 " + a + " 連上去";
+    }
+  };
+  relabel();
+  idIn.addEventListener("input", () => { relabel(); err.textContent = ""; });
+  const submit = async () => {
+    const id = idIn.value.trim();
+    if (!id) { err.textContent = "請輸入標題"; return; }
+    try {
+      await structural("abstract", () => ({ id,
+        children: ids.map((c) => ({ id: c, base: lib.nodes[c].hash })),
+        rehang: boxes.filter((b) => b.cb.checked).map((b) => b.r) }));
+      $("#dlg").close();
+      selMode = false; picked.clear();
+      flow = { id, children: ids };
+      view = "abstract";
+      selected = id;
+      editorFor = null;
+      render();
+      $("#f-body") && $("#f-body").focus();
+    } catch (e) { err.textContent = e.message; }
+  };
+  idIn.addEventListener("keydown", (ev) => { if (ev.key === "Enter") submit(); });
+  openDialog(
+    h("h3", {}, "抽出上層"),
+    h("p", { class: "muted", style: "margin-top:0" }, "選取的理論：" + ids.join("、")),
+    h("div", { class: "field" }, h("label", {}, "標題 ", h("small", {}, TITLE_HINT_SHORT)), idIn),
+    boxes.length ? h("div", { class: "field" }, h("label", {}, "新理論的父節點 ", h("small", {}, "選取的理論共同的父節點")),
+      boxes.map((b) => h("label", { class: "chk" }, b.cb, h("span", {}, "掛在 " + b.r + " 下", b.note)))) : null,
+    err,
+    h("div", { class: "foot" },
+      h("button", { onclick: () => $("#dlg").close() }, "取消"),
+      h("button", { class: "primary", onclick: submit }, "建立")));
+  idIn.focus();
+}
+
+async function toggleDisabled(id, disabled) {
+  try {
+    await structural("set_disabled", () => ({ id, base: lib.nodes[id].hash, disabled }));
+  } catch (e) { setStatus("切換失敗：" + e.message, "err"); }
+  renderEditor();
+}
+
+function openDeleteDialog(id) {
+  const n = lib.nodes[id];
+  const kids = childrenOf(id);
+  const ups = n.parsed ? n.parents.filter((p) => lib.nodes[p]) : [];
+  const err = h("div", { class: "err" });
+  const sep = lib.dir.includes("\\") ? "\\" : "/";
+  const submit = async () => {
+    try {
+      await structural("delete", () => ({ id, base: lib.nodes[id].hash,
+        children: kids.map((c) => ({ id: c, base: lib.nodes[c].hash })) }));
+      $("#dlg").close();
+      // the workspace has nothing left to abstract: back to the main view
+      if (flow && (flow.id === id || flow.children.includes(id))) {
+        flow = null;
+        view = "main";
+        editorFor = undefined;      // the placeholder was just drawn into the workspace's editor
+      }
+      selected = null;
+      render();
+      setStatus("已刪除 " + id, "ok");
+    } catch (e) { err.textContent = e.message; }
+  };
+  // a deleted root has nowhere to send its children: those with no other parent become roots
+  const roots = ups.length ? [] : kids.filter((c) => !lib.nodes[c].parents.some((p) => p !== id && lib.nodes[p]));
+  let kidsPart = null;
+  if (kids.length) {
+    kidsPart = h("div", { class: "field" },
+      h("p", { style: "margin:0" }, ups.length
+        ? "子節點 " + kids.join("、") + " 會改掛到 " + ups.join("、") + " 下。"
+        : roots.length === kids.length
+          ? "子節點 " + kids.join("、") + " 會變成最上層的根節點。"
+          : "子節點 " + kids.join("、") + " 會少掉這個父節點" + (roots.length
+            ? "；" + roots.join("、") + " 沒有其他父節點，會變成最上層的根節點。" : "。")),
+      h("p", { class: "muted", style: "margin:4px 0 0" }, "子節點的內文都不會被改動。"));
+  }
+  openDialog(
+    h("h3", {}, "刪除 " + id + "？"),
+    h("p", { class: "muted", style: "margin-top:0" }, "檔案會移到 " + lib.dir + sep + ".trash"
+      + "，要救回來的話把它搬回理論庫資料夾即可。"),
+    kidsPart,
+    err,
+    h("div", { class: "foot" },
+      h("button", { onclick: () => $("#dlg").close() }, "取消"),
+      h("button", { class: "danger", onclick: submit }, "刪除")));
+}
+
+// zip export / import -------------------------------------------------------------
+async function exportZip() {
+  try {
+    await flushAll();
+    const r = await fetch("/api/export", { headers: { "X-Theory-Token": TOKEN } });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const url = URL.createObjectURL(await r.blob());
+    const d = new Date(), pad = (x) => String(x).padStart(2, "0");
+    const a = h("a", { href: url, download: libName() + "-" + d.getFullYear()
+      + pad(d.getMonth() + 1) + pad(d.getDate()) + ".zip" });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setStatus("已匯出 " + Object.keys(lib.nodes).length + " 個理論", "ok");
+  } catch (e) { setStatus("匯出失敗：" + e.message, "err"); }
+}
+
+function fileBase64(file) {
+  return new Promise((ok, fail) => {
+    const r = new FileReader();
+    r.onload = () => ok(r.result.slice(r.result.indexOf(",") + 1));
+    r.onerror = () => fail(r.error);
+    r.readAsDataURL(file);
+  });
+}
+
+// nothing is written until the user has seen what the zip would add and replace
+async function startImport(ev) {
+  const file = ev.target.files[0];
+  ev.target.value = "";             // picking the same file again fires change again
+  if (!file) return;
+  try {
+    const zip = await fileBase64(file);
+    openImportDialog(file.name, zip, (await api("import_plan", { zip })).result);
+  } catch (e) { setStatus("匯入失敗：" + e.message, "err"); }
+}
+
+function openImportDialog(fileName, zip, plan) {
+  const err = h("div", { class: "err" });
+  const names = (ids) => h("p", { class: "muted", style: "margin:2px 0 0" }, ids.join("、"));
+  const keep = h("input", { type: "radio", name: "imp-differ", checked: true });
+  const replace = h("input", { type: "radio", name: "imp-differ" });
+  const go = h("button", { class: "primary" });
+  const count = () => plan.new.length + (replace.checked ? plan.differ.length : 0);
+  const relabel = () => { go.disabled = !count(); go.textContent = "匯入 " + count() + " 個"; };
+  keep.addEventListener("change", relabel);
+  replace.addEventListener("change", relabel);
+  relabel();
+  go.addEventListener("click", async () => {
+    try {
+      const j = await structural("import", () => ({ zip, overwrite: replace.checked,
+        // the versions listed here: one edited since is not replaced unseen
+        bases: Object.fromEntries(plan.differ.map((x) => [x.existing, x.base])) }));
+      $("#dlg").close();
+      const r = j.result;
+      setStatus("已匯入：新增 " + r.added + " 個" + (r.replaced ? "、取代 " + r.replaced + " 個" : ""), "ok");
+    } catch (e) { err.textContent = e.message + (e.status === 409 ? "，請重新匯入一次" : ""); }
+  });
+  openDialog(
+    h("h3", {}, "匯入 " + fileName),
+    plan.new.length ? h("div", { class: "field" },
+      h("label", {}, "新增 " + plan.new.length + " 個理論"), names(plan.new)) : null,
+    plan.differ.length ? h("div", { class: "field" },
+      h("label", {}, plan.differ.length + " 個和理論庫裡的理論同名，但內容不同"),
+      names(plan.differ.map((x) => x.id)),
+      h("label", { class: "chk" }, keep, h("span", {}, "保留理論庫裡的版本",
+        h("small", {}, "zip 裡的這幾個不匯入"))),
+      h("label", { class: "chk" }, replace, h("span", {}, "改用 zip 裡的版本",
+        h("small", {}, "理論庫裡的版本移到 .trash，要救回來的話把它搬回理論庫資料夾即可")))) : null,
+    plan.same.length ? h("p", { class: "muted" },
+      plan.same.length + " 個和理論庫裡的內容完全相同，不必匯入。") : null,
+    plan.skipped.length ? h("details", {}, h("summary", {}, "略過 " + plan.skipped.length + " 個檔案"),
+      h("ul", {}, plan.skipped.map((x) => h("li", {}, x.name + "：" + x.reason)))) : null,
+    !plan.new.length && !plan.differ.length
+      ? h("p", { class: "muted" }, "這個 zip 裡沒有要匯入的理論。") : null,
+    err,
+    h("div", { class: "foot" },
+      h("button", { onclick: () => $("#dlg").close() }, "取消"), go));
+}
+
+// abstraction workspace ---------------------------------------------------------------
+function renderWorkspace() {
+  swap($("#ws-head"), 
+    h("span", {}, h("b", {}, "抽象 " + flow.id), h("span", { class: "muted" }, "：比對子節點並寫出共享骨架")));
+  const kids = flow.children.filter((c) => lib.nodes[c]);
+  const cols = $("#cols");
+  cols.style.setProperty("--ncols", Math.max(kids.length, 1));
+  const box = h("div", {}, kids.map((c) => h("div", { class: "col" }, h("h3", {}, c, " ", h("small", {}, "子節點・唯讀")), nodeView(c))));
+  if (cols.dataset.html !== box.innerHTML) {
+    cols.dataset.html = box.innerHTML;
+    cols.replaceChildren(...box.childNodes);
+  }
+  swap($("#ws-foot"), h("button", { class: "primary", onclick: leaveWorkspace }, "完成，回到理論庫"));
+}
+
+// the children keep their full text, so nothing is left to fill in afterwards:
+// back in the main view with the new parent selected
+async function leaveWorkspace() {
+  const id = flow.id;
+  await flush(id);
+  view = "main";
+  flow = null;
+  editorFor = null;
+  render();
+  if (lib.nodes[id]) select(id);
+}
+
+// drag a vertical splitter to set a width; the last width sticks per browser
+function splitter(handle, target, prop, key, measure, limits) {
+  const load = () => { try { return localStorage.getItem(key); } catch (_) { return null; } };
+  const saved = load();
+  if (saved) target.style.setProperty(prop, saved);
+  let startX = 0, startW = 0, w = "";
+  const move = (ev) => {
+    const [lo, hi] = limits();
+    w = Math.round(Math.max(lo, Math.min(hi, startW + ev.clientX - startX))) + "px";
+    target.style.setProperty(prop, w);
+  };
+  handle.addEventListener("mousedown", (ev) => {
+    startX = ev.clientX; startW = measure();
+    handle.classList.add("drag");
+    document.addEventListener("mousemove", move);
+    document.addEventListener("mouseup", () => {
+      document.removeEventListener("mousemove", move);
+      handle.classList.remove("drag");
+      try { if (w) localStorage.setItem(key, w); } catch (_) { /* storage blocked */ }
+    }, { once: true });
+    ev.preventDefault();
+  });
+}
+splitter($("#tree-handle"), $("#main"), "--tree-w", "theory-dag.tree-w",
+  () => $("#tree").offsetWidth, () => [200, Math.min(640, window.innerWidth - 500)]);
+splitter($("#divider"), $("#workspace"), "--ed-w", "theory-dag.ed-w",
+  () => $("#ws-editor").offsetWidth, () => [320, $("#ws-body").offsetWidth - 327]);
+
+// wiring --------------------------------------------------------------------------
+$("#btn-new").addEventListener("click", () => openCreateDialog());
+$("#btn-export").addEventListener("click", exportZip);
+$("#btn-import").addEventListener("click", () => $("#import-file").click());
+$("#import-file").addEventListener("change", startImport);
+$("#btn-abstract").addEventListener("click", () => {
+  selMode = true; picked.clear(); flow = null; render();
+});
+$("#filter").addEventListener("input", (ev) => setFilterText(ev.target.value));
+$("#filter").addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape" && filterText) { ev.stopPropagation(); setFilterText(""); }
+});
+$("#filter-clear").addEventListener("click", () => { setFilterText(""); $("#filter").focus(); });
+$("#focus-exit").addEventListener("click", () => setFocusMode(false));
+$("#focus-ref").addEventListener("click", () => {
+  focusRef = !focusRef;
+  store("theory-dag.focus-ref", focusRef ? "1" : "");
+  render();
+});
+$("#btn-logout").addEventListener("click", () => {
+  backend.disconnect();
+  lib = null;
+  selected = null;
+  render();
+});
+// the strip shown at the top of the tree while a row is dragged: dropping there removes the edge
+$("#drop-root").addEventListener("dragover", (ev) => overDrop(ev, null));
+$("#drop-root").addEventListener("dragleave", (ev) => ev.currentTarget.classList.remove("drop-ok"));
+$("#drop-root").addEventListener("drop", (ev) => { ev.preventDefault(); dropOn(null, false); });
+NARROW.addEventListener("change", () => { if (lib) render(); });
+window.addEventListener("popstate", () => {
+  const id = decodeURIComponent(location.hash.slice(1));
+  selected = lib && lib.nodes[id] ? id : null;
+  narrowTab = "body";
+  if (relatedEditing) { flush(relatedEditing); relatedEditing = null; }
+  if (lib) render();
+});
+document.addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape" && selMode && !$("#dlg").open) cancelSelect();
+  if (ev.key === "Escape" && document.body.classList.contains("focus") && !$("#dlg").open) setFocusMode(false);
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName) || ev.target.isContentEditable;
+  if (ev.key === "/" && !typing && !$("#dlg").open && view === "main" && lib && lib.exists
+    && !document.body.classList.contains("focus") && !(NARROW.matches && selected)) {
+    ev.preventDefault();
+    $("#filter").focus();
+    $("#filter").select();
+  }
+});
+window.addEventListener("beforeunload", (ev) => {
+  if (Object.keys(drafts).length) { flushAll(); ev.preventDefault(); ev.returnValue = ""; }
+});
+
+// the first load runs even in a background tab: the browser may open the page
+// unfocused, and a page that waits for focus to load looks broken
+async function poll(first) {
+  if (!backend.ready) { render(); return; }
+  if (!first && (document.hidden || writesInFlight)) return;
+  const epoch = writeEpoch;
+  try {
+    const L = await api("library");
+    // nothing changed on disk: leave the DOM alone, or a click landing between
+    // mousedown and mouseup would hit an element that was just replaced
+    if (lib && JSON.stringify(L) === JSON.stringify(lib)) return;
+    if (first) {
+      const id = decodeURIComponent(location.hash.slice(1));
+      if (id && L.nodes[id]) selected = id;
+    }
+    if (epoch === writeEpoch && !writesInFlight) setLibrary(L);
+    if (first) revealSelected();
+  }
+  catch (e) { setStatus((backend.mode === "server" ? "連不上 server：" : "") + e.message, "err"); }
+}
+window.addEventListener("focus", () => {
+  // back at the page: whatever the phone saved meanwhile should show up now
+  if (lib && lib.sync) request("sync_now", {}).catch(() => {});
+  poll();
+});
+setInterval(poll, backend.pollMs);
+poll(true);
+</script>
+</body>
+</html>
