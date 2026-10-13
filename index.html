@@ -764,8 +764,12 @@ function backToList() {
 function renderLogin() {
   $("#main").style.display = "none";
   $("#nolib").style.display = "flex";
+  // polling and coming back to the window render again: keep what is being typed
+  if ($("#nolib .card.login")) return;
   const err = h("div", { class: "err" });
-  const repo = h("input", { placeholder: "帳號/倉庫名稱", autocapitalize: "off", spellcheck: false });
+  // remembered as typed: the phone may drop the tab while the user goes off to make a token
+  const repo = h("input", { placeholder: "帳號/倉庫名稱", autocapitalize: "off", spellcheck: false,
+    value: stored("theory-dag.github-repo", ""), oninput: () => store("theory-dag.github-repo", repo.value) });
   const token = h("input", { type: "password", placeholder: "github_pat_…", autocomplete: "off" });
   const go = h("button", { class: "primary", onclick: async () => {
     const r = repo.value.trim().replace(/^https:\/\/github\.com\//, "").replace(/\.git$/, "");
