@@ -206,6 +206,7 @@ dialog label.chk input { width: auto; margin-top: 4px; }
 .group { padding: 10px 12px 2px; font-size: 12px; color: var(--muted); }
 .row .meta { color: var(--muted); font-size: 12px; margin-left: auto; padding-left: 8px;
   flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.row .meta.usage { flex: none; }   /* a cut count or date reads as nothing: the title gives way instead */
 button.link { border: none; background: none; padding: 0 2px; color: var(--accent); text-decoration: underline; }
 button.on { background: var(--sel); border-color: var(--accent); }
 
@@ -1026,7 +1027,7 @@ function renderList(host) {
     }, dotFor(n), h("span", { class: "rid" }, id),
     n.disabled ? h("span", { class: "tag", title: "agent 看不到這個理論" }, "停用") : null,
     s ? h("span", { class: "rsum" }, s) : null,
-    meta ? h("span", { class: "meta", title: meta }, meta) : null));
+    meta ? h("span", { class: listMode === "usage" ? "meta usage" : "meta", title: meta }, meta) : null));
   }
   swap(host, out);
 }
